@@ -12,3 +12,4 @@ replay_pid*.log
 .superpowers/
 AGENTS.md
 branding/*-v*.png
+snapton-*-device.png

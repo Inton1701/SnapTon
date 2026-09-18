@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FloatingActionButton
@@ -30,6 +34,17 @@ import com.inton1701.snapton.core.ui.icon.SnapTonIcons
 import com.inton1701.snapton.core.ui.theme.ActiveBlue
 import com.inton1701.snapton.core.ui.theme.Hairline
 import com.inton1701.snapton.core.ui.theme.PrimaryBlue
+import kotlin.math.roundToInt
+
+object BottomBarLayout {
+    private const val ContentHeightDp = 92
+    private const val SurfaceContentHeightDp = 72
+
+    fun totalHeightDp(navigationInsetDp: Int): Int = ContentHeightDp + navigationInsetDp.coerceAtLeast(0)
+
+    fun surfaceHeightDp(navigationInsetDp: Int): Int =
+        SurfaceContentHeightDp + navigationInsetDp.coerceAtLeast(0)
+}
 
 @Composable
 fun SnapTonBottomBar(
@@ -37,10 +52,12 @@ fun SnapTonBottomBar(
     onDestinationSelected: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val navigationInsetDp = navigationInset.value.roundToInt()
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(92.dp),
+            .height(BottomBarLayout.totalHeightDp(navigationInsetDp).dp),
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -49,11 +66,13 @@ fun SnapTonBottomBar(
             border = androidx.compose.foundation.BorderStroke(1.dp, Hairline.copy(alpha = 0.65f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
+                .height(BottomBarLayout.surfaceHeightDp(navigationInsetDp).dp)
                 .align(Alignment.BottomCenter),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = navigationInset),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
