@@ -1,4 +1,5 @@
 .gradle/
+.kotlin/
 .idea/
 build/
 **/build/
@@ -6,6 +7,8 @@ local.properties
 *.iml
 .externalNativeBuild/
 .cxx/
+hs_err_pid*.log
+replay_pid*.log
 .superpowers/
 AGENTS.md
 branding/*-v*.png
