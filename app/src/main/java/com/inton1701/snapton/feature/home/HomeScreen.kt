@@ -41,9 +41,9 @@ import com.inton1701.snapton.core.ui.theme.OfflineGreen
 
 @Composable
 fun HomeScreen(
-    recentDocuments: List<RecentDocument> = emptyList(),
     onToolSelected: (ToolId) -> Unit,
     modifier: Modifier = Modifier,
+    recentDocuments: List<RecentDocument> = emptyList(),
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val visibleDocuments = recentDocuments.filter {

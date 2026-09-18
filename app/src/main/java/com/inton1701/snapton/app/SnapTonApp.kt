@@ -1,25 +1,22 @@
 package com.inton1701.snapton.app
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.inton1701.snapton.core.ui.component.SnapTonBottomBar
 import com.inton1701.snapton.core.ui.theme.SnapTonTheme
+import com.inton1701.snapton.feature.camera.CameraEntryScreen
 import com.inton1701.snapton.feature.home.HomeScreen
 import com.inton1701.snapton.feature.home.ToolId
+import com.inton1701.snapton.feature.library.LibraryScreen
+import com.inton1701.snapton.feature.settings.SettingsScreen
+import com.inton1701.snapton.feature.tools.ToolsScreen
 
 @Composable
 fun SnapTonApp(initialDestination: AppDestination = AppDestination.Home) {
@@ -29,10 +26,12 @@ fun SnapTonApp(initialDestination: AppDestination = AppDestination.Home) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                SnapTonBottomBar(
-                    selected = destination,
-                    onDestinationSelected = { destination = it },
-                )
+                if (destination != AppDestination.Scan) {
+                    SnapTonBottomBar(
+                        selected = destination,
+                        onDestinationSelected = { destination = it },
+                    )
+                }
             },
         ) { padding ->
             when (destination) {
@@ -46,38 +45,11 @@ fun SnapTonApp(initialDestination: AppDestination = AppDestination.Home) {
                     },
                     modifier = Modifier.padding(padding),
                 )
-                else -> DestinationIntro(destination = destination, padding = padding)
+                AppDestination.Library -> LibraryScreen(contentPadding = padding)
+                AppDestination.Scan -> CameraEntryScreen(onClose = { destination = AppDestination.Home })
+                AppDestination.Tools -> ToolsScreen(contentPadding = padding, onToolSelected = {})
+                AppDestination.Settings -> SettingsScreen(contentPadding = padding)
             }
         }
-    }
-}
-
-@Composable
-private fun DestinationIntro(destination: AppDestination, padding: PaddingValues) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = destination.label,
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = when (destination) {
-                AppDestination.Home -> "Your scans and tools, all on this device."
-                AppDestination.Library -> "Find every document stored on this device."
-                AppDestination.Scan -> "Point the camera at a document to begin."
-                AppDestination.Tools -> "Convert, recognize, translate, and solve offline."
-                AppDestination.Settings -> "Control storage, models, privacy, and motion."
-            },
-            modifier = Modifier.padding(top = 8.dp),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
