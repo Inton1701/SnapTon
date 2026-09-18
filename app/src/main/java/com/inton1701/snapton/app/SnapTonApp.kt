@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.inton1701.snapton.core.ui.component.SnapTonBottomBar
 import com.inton1701.snapton.core.ui.theme.SnapTonTheme
+import com.inton1701.snapton.feature.home.HomeScreen
+import com.inton1701.snapton.feature.home.ToolId
 
 @Composable
 fun SnapTonApp(initialDestination: AppDestination = AppDestination.Home) {
@@ -33,7 +35,19 @@ fun SnapTonApp(initialDestination: AppDestination = AppDestination.Home) {
                 )
             },
         ) { padding ->
-            DestinationIntro(destination = destination, padding = padding)
+            when (destination) {
+                AppDestination.Home -> HomeScreen(
+                    onToolSelected = { tool ->
+                        destination = when (tool) {
+                            ToolId.ScanId, ToolId.ImageToPdf -> AppDestination.Scan
+                            ToolId.AllTools -> AppDestination.Tools
+                            else -> AppDestination.Tools
+                        }
+                    },
+                    modifier = Modifier.padding(padding),
+                )
+                else -> DestinationIntro(destination = destination, padding = padding)
+            }
         }
     }
 }
