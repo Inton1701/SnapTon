@@ -14,18 +14,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun CameraPreview(
     onImageCaptureReady: (ImageCapture) -> Unit,
     onCameraReady: (Camera) -> Unit,
+    onImageCaptureCleared: () -> Unit = {},
+    onCameraUnavailable: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnImageCaptureReady = rememberUpdatedState(onImageCaptureReady)
     val currentOnCameraReady = rememberUpdatedState(onCameraReady)
+    val currentOnImageCaptureCleared = rememberUpdatedState(onImageCaptureCleared)
+    val currentOnCameraUnavailable = rememberUpdatedState(onCameraUnavailable)
     val previewView = remember(context) {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
@@ -40,38 +46,53 @@ fun CameraPreview(
         var boundProvider: ProcessCameraProvider? = null
         var boundPreview: Preview? = null
         var boundImageCapture: ImageCapture? = null
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> boundImageCapture?.let(currentOnImageCaptureReady.value)
+                Lifecycle.Event.ON_STOP -> currentOnImageCaptureCleared.value()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         cameraProviderFuture.addListener(
             {
                 if (disposed) return@addListener
 
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.surfaceProvider = previewView.surfaceProvider
+                    }
+                    val imageCapture = ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .build()
+
+                    cameraProvider.unbindAll()
+                    val camera = cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageCapture,
+                    )
+
+                    boundProvider = cameraProvider
+                    boundPreview = preview
+                    boundImageCapture = imageCapture
+                    currentOnImageCaptureReady.value(imageCapture)
+                    currentOnCameraReady.value(camera)
+                } catch (_: Exception) {
+                    currentOnImageCaptureCleared.value()
+                    currentOnCameraUnavailable.value()
                 }
-                val imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .build()
-
-                cameraProvider.unbindAll()
-                val camera = cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageCapture,
-                )
-
-                boundProvider = cameraProvider
-                boundPreview = preview
-                boundImageCapture = imageCapture
-                currentOnImageCaptureReady.value(imageCapture)
-                currentOnCameraReady.value(camera)
             },
             mainExecutor,
         )
 
         onDispose {
             disposed = true
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            currentOnImageCaptureCleared.value()
             val preview = boundPreview
             val imageCapture = boundImageCapture
             if (preview != null && imageCapture != null) {

@@ -1,9 +1,15 @@
 package com.inton1701.snapton.feature.camera
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CameraPermissionStateTest {
+    @Test
+    fun permissionStatesUseSealedInterfaceContract() {
+        assertTrue(CameraPermissionState::class.java.isInterface)
+    }
+
     @Test
     fun newSessionRequestsPermissionWhenNotGranted() {
         assertEquals(

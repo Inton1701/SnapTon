@@ -44,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +59,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -84,6 +87,7 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
         mutableStateOf(permissionPreferences.getBoolean("requested_before", false))
     }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    var cameraUnavailable by remember { mutableStateOf(false) }
     val permissionState = cameraPermissionState(permissionGranted, requestedBefore)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -110,6 +114,10 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
         if (permissionState == CameraPermissionState.NeedsRequest) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
+        if (permissionState != CameraPermissionState.Granted) {
+            imageCapture = null
+            cameraUnavailable = false
+        }
     }
 
     val modes = listOf("Document", "ID card", "Book", "QR")
@@ -131,12 +139,16 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 ),
             ),
     ) {
-        if (permissionState == CameraPermissionState.Granted) {
+        if (permissionState == CameraPermissionState.Granted && !cameraUnavailable) {
             CameraPreview(
                 onImageCaptureReady = { imageCapture = it },
                 onCameraReady = {},
+                onImageCaptureCleared = { imageCapture = null },
+                onCameraUnavailable = { cameraUnavailable = true },
                 modifier = Modifier.fillMaxSize(),
             )
+        } else if (cameraUnavailable) {
+            CameraUnavailableMessage(modifier = Modifier.align(Alignment.Center))
         } else {
             CameraPermissionMessage(
                 permissionState = permissionState,
@@ -227,6 +239,7 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                         fontWeight = if (mode == selectedMode) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier
                             .clickable { selectedMode = mode }
+                            .minimumInteractiveComponentSize()
                             .border(
                                 width = if (mode == selectedMode) 1.dp else 0.dp,
                                 color = if (mode == selectedMode) ActiveBlue else Color.Transparent,
@@ -251,6 +264,7 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     enabled = imageCapture != null,
                     modifier = Modifier
                         .size(78.dp)
+                        .semantics { contentDescription = "Capture document" }
                         .border(4.dp, Color.White, CircleShape)
                         .padding(7.dp),
                     shape = CircleShape,
@@ -261,6 +275,27 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CameraUnavailableMessage(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            text = "Camera unavailable",
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = "Close the scanner and try again, or use a device with a working camera.",
+            color = Color.White.copy(alpha = 0.74f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
