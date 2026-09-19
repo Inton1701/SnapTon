@@ -1,5 +1,12 @@
 package com.inton1701.snapton.feature.camera
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -38,6 +45,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,12 +57,61 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.camera.core.ImageCapture
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.inton1701.snapton.core.ui.theme.ActiveBlue
 
 @Composable
 fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val permissionPreferences = remember(context) {
+        context.getSharedPreferences("camera_permission", 0)
+    }
+    var permissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    var requestedBefore by remember {
+        mutableStateOf(permissionPreferences.getBoolean("requested_before", false))
+    }
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    val permissionState = cameraPermissionState(permissionGranted, requestedBefore)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        requestedBefore = true
+        permissionPreferences.edit().putBoolean("requested_before", true).apply()
+        permissionGranted = granted
+    }
+
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permissionGranted = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA,
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(permissionState) {
+        if (permissionState == CameraPermissionState.NeedsRequest) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     val modes = listOf("Document", "ID card", "Book", "QR")
     var selectedMode by remember { mutableStateOf("Document") }
     val transition = rememberInfiniteTransition(label = "scan-line")
@@ -73,6 +131,30 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 ),
             ),
     ) {
+        if (permissionState == CameraPermissionState.Granted) {
+            CameraPreview(
+                onImageCaptureReady = { imageCapture = it },
+                onCameraReady = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            CameraPermissionMessage(
+                permissionState = permissionState,
+                onRequestPermission = {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                },
+                onOpenSettings = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        ),
+                    )
+                },
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -166,6 +248,7 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 }
                 Surface(
                     onClick = {},
+                    enabled = imageCapture != null,
                     modifier = Modifier
                         .size(78.dp)
                         .border(4.dp, Color.White, CircleShape)
@@ -177,6 +260,60 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     Text("1", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CameraPermissionMessage(
+    permissionState: CameraPermissionState,
+    onRequestPermission: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            text = if (permissionState == CameraPermissionState.Denied) {
+                "Camera access is off"
+            } else {
+                "Camera access is needed to scan"
+            },
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = if (permissionState == CameraPermissionState.Denied) {
+                "Allow camera access in Settings to scan documents."
+            } else {
+                "SnapTon uses the camera only while the scanner is open."
+            },
+            color = Color.White.copy(alpha = 0.74f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Surface(
+            onClick = if (permissionState == CameraPermissionState.Denied) {
+                onOpenSettings
+            } else {
+                onRequestPermission
+            },
+            color = ActiveBlue,
+            shape = RoundedCornerShape(18.dp),
+        ) {
+            Text(
+                text = if (permissionState == CameraPermissionState.Denied) {
+                    "Open Settings"
+                } else {
+                    "Allow camera"
+                },
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }
