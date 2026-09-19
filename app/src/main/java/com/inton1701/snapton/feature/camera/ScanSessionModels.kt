@@ -1,15 +1,7 @@
 package com.inton1701.snapton.feature.camera
 
 import java.util.UUID
-
-data class PagePoint(val x: Float, val y: Float)
-
-data class PageCorners(
-    val topLeft: PagePoint,
-    val topRight: PagePoint,
-    val bottomRight: PagePoint,
-    val bottomLeft: PagePoint,
-)
+import com.inton1701.snapton.engine.image.PageCorners
 
 data class CapturedPage(
     val id: String = UUID.randomUUID().toString(),
