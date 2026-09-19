@@ -48,6 +48,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.camera.core.ImageCapture
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -88,6 +90,11 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
     }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var cameraUnavailable by remember { mutableStateOf(false) }
+    val sessionController = remember(context) {
+        ScanSessionController(CaptureFileFactory(context))
+    }
+    val sessionState by sessionController.state.collectAsState()
+    var flashVisible by remember { mutableStateOf(false) }
     val permissionState = cameraPermissionState(permissionGranted, requestedBefore)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -117,6 +124,14 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
         if (permissionState != CameraPermissionState.Granted) {
             imageCapture = null
             cameraUnavailable = false
+        }
+    }
+
+    LaunchedEffect(sessionState.pages.size) {
+        if (sessionState.pages.isNotEmpty()) {
+            flashVisible = true
+            delay(110)
+            flashVisible = false
         }
     }
 
@@ -185,6 +200,14 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 start = Offset(12.dp.toPx(), y),
                 end = Offset(size.width - 12.dp.toPx(), y),
                 strokeWidth = 2.dp.toPx(),
+            )
+        }
+
+        if (flashVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.78f)),
             )
         }
 
@@ -260,8 +283,8 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     Icon(Icons.Outlined.PhotoLibrary, contentDescription = "Import image", tint = Color.White)
                 }
                 Surface(
-                    onClick = {},
-                    enabled = imageCapture != null,
+                    onClick = { imageCapture?.let(sessionController::capture) },
+                    enabled = imageCapture != null && !sessionState.captureInProgress,
                     modifier = Modifier
                         .size(78.dp)
                         .semantics { contentDescription = "Capture document" }
@@ -271,7 +294,7 @@ fun CameraEntryScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     color = ActiveBlue,
                 ) {}
                 Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    Text("1", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(sessionState.pages.size.toString(), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
